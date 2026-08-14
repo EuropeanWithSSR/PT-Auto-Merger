@@ -65,7 +65,7 @@ def run_ultimate_merger_v4():
                         if 2 in piece_tuple:
                             completed_pieces += 1
                     global_ratio = completed_pieces / total_pieces
-                    print(global_ratio)
+                    print(f"[{name}] 实时联合进度: {global_ratio * 100:.2f}%")
 
                 # ============ 瀑布流调度逻辑 ============
                 
