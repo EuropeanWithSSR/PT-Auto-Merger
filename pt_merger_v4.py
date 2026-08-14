@@ -2,7 +2,7 @@ import requests
 import time
 
 # ================= 基础配置区 =================
-QB_URL = "http://10.0.0.1:8080"
+QB_URL = "http://127.0.0.1:8080"
 USERNAME = "admin"
 PASSWORD = "adminadmin"
 
