@@ -126,4 +126,3 @@ journalctl -u pt_merger -f
 
 MIT License
 
-```
