@@ -10,6 +10,7 @@ PASSWORD = "adminadmin"
 GAP_THRESHOLD_BYTES = 5 * 1024 * 1024 * 1024  # 绝对体积差：5 GB (触发中途校验的底线)
 COOLDOWN_SECONDS = 45 * 60                    # 冷却时间：45 分钟 (保护硬盘，防频繁读写)
 SAFE_ZONE_RATIO = 0.95                        # 终点免打扰区：95% (最后 5% 冲刺期绝不干预)
+REQ_TIMEOUT = 10                              # API请求超时时间（秒）
 # ==============================================
 
 # 内存数据库：用于记录每个哈希值的“上一次强制校验时间”
@@ -19,7 +20,7 @@ def run_ultimate_merger_v4():
     session = requests.Session()
     
     print("正在连接 qBittorrent...")
-    if session.post(f"{QB_URL}/api/v2/auth/login", data={"username": USERNAME, "password": PASSWORD}).text != "Ok.":
+    if session.post(f"{QB_URL}/api/v2/auth/login", data={"username": USERNAME, "password": PASSWORD}, timeout=REQ_TIMEOUT).text != "Ok.":
         print("登录失败！请检查配置。")
         return
     print("登录成功！V4.0 企业级智能调度系统已上线...\n")
@@ -27,7 +28,7 @@ def run_ultimate_merger_v4():
     while True:
         try:
             # 优化点 1：只拉取一次总列表 (包含下载中、做种中等所有状态)，极大降低接口压力
-            all_torrents = session.get(f"{QB_URL}/api/v2/torrents/info").json()
+            all_torrents = session.get(f"{QB_URL}/api/v2/torrents/info", timeout=REQ_TIMEOUT).json()
             
             # 以特征值为 Key 进行分组
             groups = {}
@@ -58,7 +59,7 @@ def run_ultimate_merger_v4():
                     global_ratio = 1.0  # 大佬带飞，全局进度直接认定为 100%
                 else:
                     # 只有都没下完时，才去拉取 pieceStates 算按位或运算
-                    all_states = [session.get(f"{QB_URL}/api/v2/torrents/pieceStates?hash={s['hash']}").json() for s in siblings]
+                    all_states = [session.get(f"{QB_URL}/api/v2/torrents/pieceStates?hash={s['hash']}", timeout=REQ_TIMEOUT).json() for s in siblings]
                     total_pieces = len(all_states[0])
                     completed_pieces = 0
                     for piece_tuple in zip(*all_states):
@@ -100,6 +101,8 @@ def run_ultimate_merger_v4():
                             # 刷新该任务的冷却时间戳
                             cooldown_db[hash_str] = time.time()
 
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ 遭遇网络波动或 qBit 卡顿，本轮检测已跳过。原因: {e}") 
         except Exception as e:
             pass # 发生网络波动，静默忽略
             
@@ -111,16 +114,16 @@ def execute_magic_combo(session, hash_list, action_name):
     """
     hashes_str = "|".join(hash_list)
     print("    [-] 执行强制暂停 (切断汇报)...")
-    session.post(f"{QB_URL}/api/v2/torrents/pause", data={"hashes": hashes_str})
+    session.post(f"{QB_URL}/api/v2/torrents/pause", data={"hashes": hashes_str}, timeout=REQ_TIMEOUT)
     
     time.sleep(3) # 留出 3 秒，让底层 I/O 引擎有充足时间把内存数据刷入硬盘
     
     print("    [~] 执行硬盘校验 (盘点数据)...")
-    session.post(f"{QB_URL}/api/v2/torrents/recheck", data={"hashes": hashes_str})
+    session.post(f"{QB_URL}/api/v2/torrents/recheck", data={"hashes": hashes_str}, timeout=REQ_TIMEOUT)
     
     # 瞬间给底层引擎发 Resume，引擎会自动排队，等校验走完直接满血复活
     print(f"    [+] 预置恢复指令 ({action_name})...")
-    session.post(f"{QB_URL}/api/v2/torrents/resume", data={"hashes": hashes_str})
+    session.post(f"{QB_URL}/api/v2/torrents/resume", data={"hashes": hashes_str}, timeout=REQ_TIMEOUT)
     print("    执行完毕！\n")
 
 if __name__ == "__main__":
