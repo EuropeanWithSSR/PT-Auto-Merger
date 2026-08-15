@@ -36,7 +36,7 @@ pip install requests
 
 ```python
 # ================= 基础配置区 =================
-QB_URL = "[http://192.168.](http://192.168.)x.x:8080"  # 你的 qBittorrent WebUI 地址
+QB_URL = "http://192.168.x.x:8080"  # 你的 qBittorrent WebUI 地址
 USERNAME = "admin"                  # WebUI 用户名
 PASSWORD = "adminadmin"             # WebUI 密码
 
