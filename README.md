@@ -14,6 +14,7 @@
 *   **🧮 内存级状态矩阵运算**：利用 WebAPI 提取 `pieceStates`，在内存中进行轻量级的二进制位运算，精准计算“联合进度”。
 *   **🛡️ 工业级防风控机制**：独创 `暂停 ➔ 校验 ➔ 恢复` 三连击状态机。完美规避“边下边校验”导致的脏读报错，确保向 Tracker 汇报的日志合规平滑，100% 防封禁。
 *   **⛽ 动态中途补给站**：特设“绝对差值（默认 5GB）”与“冷却时间（默认 45 分钟）”双重阈值。在网络极度不对等时，适时强制同步进度，榨干闲置带宽的同时，**极致保护机械硬盘寿命**。
+*   **📝 内置滚动日志 (Log Rotation)**：告别 `Broken Pipe` 管道破裂报错，自带极客级 5MB 滚动日志机制，断网重连自愈，长年挂机永不爆盘。
 *   **🚀 纯反向驱动**：基于已完成状态的懒加载匹配，$O(1)$ 级时间复杂度，不拖垮软路由/NAS 性能。
 
 ## 🛠️ 安装与配置
@@ -35,7 +36,7 @@ pip install requests
 
 ```python
 # ================= 基础配置区 =================
-QB_URL = "http://192.168.x.x:8080"  # 你的 qBittorrent WebUI 地址
+QB_URL = "[http://192.168.](http://192.168.)x.x:8080"  # 你的 qBittorrent WebUI 地址
 USERNAME = "admin"                  # WebUI 用户名
 PASSWORD = "adminadmin"             # WebUI 密码
 
@@ -43,6 +44,7 @@ PASSWORD = "adminadmin"             # WebUI 密码
 GAP_THRESHOLD_BYTES = 5 * 1024**3   # 落后多少 GB 触发中途补给 (默认 5GB)
 COOLDOWN_SECONDS = 45 * 60          # 强制校验的冷却时间 (默认 45 分钟，保护硬盘)
 SAFE_ZONE_RATIO = 0.95              # 最后 5% 冲刺区免打扰
+REQ_TIMEOUT = 10                    # API请求超时时间 (防假死防阻塞机制)
 # ==============================================
 
 ```
@@ -58,36 +60,37 @@ python3 pt_merger_v4.py
 
 ### 💡 进阶：在 OpenWrt 软路由中静默挂机 (推荐)
 
-对于使用 N100 等软路由设备的极客，推荐使用系统的 `logger` 机制挂载后台，既能防内存溢出，又能随时看日志。
+对于使用 N100 等软路由设备的极客，既然脚本已经自带了强大的日志轮转系统，你可以直接将其挂载为极致精简的后台守护进程：
 
 1. **安装环境**：
+
 ```bash
 opkg update
 opkg install python3 python3-requests
 
 ```
 
+2. **挂载后台**（将标准输出丢弃，防止管道堆积崩溃，日志由 Python 内部写入文件）：
 
-2. **挂载后台**（注意加入 `-u` 参数关闭 Python 缓冲）：
 ```bash
-nohup python3 -u /root/pt_merger_v4.py 2>&1 | logger -t pt_merger &
+nohup python3 /root/pt_merger_v4.py > /dev/null 2>&1 &
 
 ```
-
 
 *(你可以将此命令加入 OpenWrt 的 `/etc/rc.local` 中实现开机自启)*
-3. **随时查岗**：
+
+3. **随时查岗**（脚本会自动在同目录下生成 `merger.log`）：
+
 ```bash
-logread | grep pt_merger
+tail -f /root/merger.log
 
 ```
-
-
 
 ### 🐧 在标准 Linux (Debian/Ubuntu/PVE) 中使用 Systemd
 
 1. 创建服务文件：`nano /etc/systemd/system/pt_merger.service`
 2. 填入以下配置：
+
 ```ini
 [Unit]
 Description=PT Cross-Site Auto Merger
@@ -98,24 +101,24 @@ Type=simple
 User=root
 Restart=always
 RestartSec=10
-# 请将路径替换为脚本实际路径，并确保使用 -u 参数
-ExecStart=/usr/bin/python3 -u /root/pt_merger_v4.py
+# 请将路径替换为脚本实际路径，日志会自动生成在脚本同目录下
+ExecStart=/usr/bin/python3 /root/pt_merger_v4.py
 
 [Install]
 WantedBy=multi-user.target
 
 ```
 
+3. 激活并启动：
 
-3. 激活并查看状态：
 ```bash
 systemctl daemon-reload
 systemctl enable pt_merger
 systemctl start pt_merger
-journalctl -u pt_merger -f
 
 ```
 
+*(注意：Systemd 环境下，业务日志同样请通过 `tail -f merger.log` 查看)*
 
 ## ⚠️ 注意事项
 
@@ -130,4 +133,6 @@ journalctl -u pt_merger -f
 ## 📜 许可证
 
 MIT License
+
+```
 
