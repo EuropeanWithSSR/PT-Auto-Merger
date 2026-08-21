@@ -71,6 +71,11 @@ def run_ultimate_merger_v4():
             for key, siblings in groups.items():
                 if len(siblings) < 2:
                     continue  # 独生子女，跳过
+                    
+                # 🚀 新增防护：如果存在正在校验的任务，直接跳过，防止冲突卡死！
+                if any(t['state'] in ['checkingUP', 'checkingDL', 'checkingResumeData'] for t in siblings):
+                    logger.info(f"[{key[0]}] 发现任务正在进行原生校验，本轮跳过干预...")
+                    continue
                 
                 # 如果这个组里【没有任何一个】任务处于下载中，说明大家都下完了，跳过
                 if not any(t['state'] in ['downloading', 'stalledDL', 'metaDL'] for t in siblings):
